@@ -51,8 +51,8 @@ pipeline {
 
         stage('Push Docker Image') {
             environment {
-                DOCKER_USERNAME = credentials('dockerhub-username')  // [Ensure this exists in Jenkins]
-                DOCKER_PASSWORD = credentials('dockerhub-password')  // [Use Docker Hub Access Token]
+                DOCKER_USERNAME = credentials('dockerhub-Jaiaradhye')  // [Ensure this exists in Jenkins]
+                DOCKER_PASSWORD = credentials('dockerhub-dckr_pat_oJjo9w3Z8TGbtcj7ISp0-eYWboY')  // [Use Docker Hub Access Token]
             }
             steps {
                 script {
