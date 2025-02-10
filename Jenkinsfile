@@ -1,86 +1,96 @@
-pipeline{
+pipeline {
     agent any
-    tools{
-        jdk 'jdk17'
-        nodejs 'node19'
-    }
+
     environment {
-        SCANNER_HOME=tool 'sonar-scanner'
+        SCANNER_HOME = tool 'sonar-scanner' // [CHANGE] SonarQube Scanner tool name in Jenkins
+        DOCKER_IMAGE = "jaiaradhye/vulscanner:latest" // [CHANGE] DockerHub image name
+        SONARQUBE_URL = "http://3.108.81.135:9000/" // [CHANGE] SonarQube server URL
+        SONARQUBE_TOKEN = "squ_b8df9e36659dc7f2dc634000b4f7d7464bd9d534" // [CHANGE] SonarQube authentication token
+        KUBE_CONFIG = "~/.kube/config" // [CHANGE] Path to Kubernetes config file
     }
+
     stages {
-        stage('Checkout from Git'){
-            steps{
-                git branch: 'master', url: 'https://github.com/NotHarshhaa/DevOps-Projects/DevOps-Project-28/Chatbot-UI.git'
-            }
-        }
-        stage('Install Dependencies') {
+        stage('Checkout Code') {
             steps {
-                sh "npm install"
+                git branch: 'main', url: 'https://github.com/Jaiaradhye/vulscannerProjectCI-CD.git' // [CHANGE] Your GitHub repo URL
             }
         }
-        stage("Sonarqube Analysis "){
-            steps{
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Chatbot \
-                    -Dsonar.projectKey=Chatbot '''
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube-server') { // [CHANGE] SonarQube server name from Jenkins settings
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectKey=NessusScanner \  # [CHANGE] Unique project key in SonarQube
+                        -Dsonar.sources=. \ # [DO NOT CHANGE] Scan all source files
+                        -Dsonar.host.url=$SONARQUBE_URL \ # [CHANGE] SonarQube server URL
+                        -Dsonar.login=$SONARQUBE_TOKEN # [CHANGE] SonarQube authentication token
+                    '''
                 }
             }
         }
-        stage("quality gate"){
-           steps {
+
+        stage('Quality Gate Check') {
+            steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
-                }
-            } 
-        }
-        stage('OWASP FS SCAN') {
-            steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            }
-        }
-        stage('TRIVY FS SCAN') {
-            steps {
-                sh "trivy fs . > trivyfs.json"
-            }
-        }
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                       sh "docker build -t chatbot ."
-                       sh "docker tag chatbot NotHarshhaa/chatbot:latest "
-                       sh "docker push NotHarshhaa/chatbot:latest "
+                    def qualityGate = waitForQualityGate() // [DO NOT CHANGE] Checks SonarQube quality gate status
+                    if (qualityGate.status != 'OK') {
+                        error "Pipeline aborted due to quality gate failure: ${qualityGate.status}"
                     }
                 }
             }
         }
-        stage("TRIVY"){
-            steps{
-                sh "trivy image NotHarshhaa/chatbot:latest > trivy.json" 
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                docker build -t $DOCKER_IMAGE .
+                '''
             }
         }
-        stage ("Remove container") {
-            steps{
-                sh "docker stop chatbot | true"
-                sh "docker rm chatbot | true"
-             }
-        }
-        stage('Deploy to container'){
-            steps{
-                sh 'docker run -d --name chatbot -p 3000:3000 NotHarshhaa/chatbot:latest'
-            }
-        }
-        stage('Deploy to kubernetes'){
-            steps{
-                withAWS(credentials: 'aws-key', region: 'us-east-1'){
-                script{
-                    withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
-                       sh 'kubectl apply -f k8s/chatbot-ui.yaml'
-                  }
+
+        stage('Push Docker Image') {
+            steps {
+                withDockerRegistry([credentialsId: 'dockerhub-credentials', url: '']) { // [CHANGE] DockerHub credentials in Jenkins
+                    sh '''
+                    docker push $DOCKER_IMAGE
+                    '''
                 }
             }
         }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                kubectl --kubeconfig=$KUBE_CONFIG apply -f k8s-nessus-deployment.yaml
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                kubectl --kubeconfig=$KUBE_CONFIG get pods -l app=nessus
+                kubectl --kubeconfig=$KUBE_CONFIG get services -l app=nessus
+                '''
+            }
+        }
+
+        stage('Monitor with Prometheus') {
+            steps {
+                sh '''
+                kubectl --kubeconfig=$KUBE_CONFIG port-forward svc/prometheus 9090:9090 &
+                '''
+            }
         }
     }
+
+    post {
+        success {
+            echo "Pipeline executed successfully!"
+        }
+        failure {
+            echo "Pipeline failed. Check logs for errors."
+        }
     }
+}
