@@ -4,7 +4,7 @@ pipeline {
     environment {
         SCANNER_HOME = tool 'sonar-scanner' // [CHANGE] SonarQube Scanner tool name in Jenkins
         DOCKER_IMAGE = "jaiaradhye/vulscanner:latest" // [CHANGE] DockerHub image name
-        SONARQUBE_URL = "http://3.108.81.135:9000/" // [CHANGE] SonarQube server URL
+        SONARQUBE_URL = "http://3.108.81.135:9000" // [CHANGE] SonarQube server URL
         SONARQUBE_TOKEN = "squ_b8df9e36659dc7f2dc634000b4f7d7464bd9d534" // [CHANGE] SonarQube authentication token
         KUBE_CONFIG = "~/.kube/config" // [CHANGE] Path to Kubernetes config file
     }
@@ -21,10 +21,10 @@ pipeline {
                 withSonarQubeEnv('sonarqube-server') { // [CHANGE] SonarQube server name from Jenkins settings
                     sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectKey=NessusScanner \  # [CHANGE] Unique project key in SonarQube
-                        -Dsonar.sources=. \ # [DO NOT CHANGE] Scan all source files
-                        -Dsonar.host.url=$http://3.108.81.135:9000/ \ # [CHANGE] SonarQube server URL
-                        -Dsonar.login=$squ_b8df9e36659dc7f2dc634000b4f7d7464bd9d534 # [CHANGE] SonarQube authentication token
+                        -Dsonar.projectKey=NessusScanner \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=http://3.108.81.135:9000 \
+                        -Dsonar.login=squ_b8df9e36659dc7f2dc634000b4f7d7464bd9d534
                     '''
                 }
             }
@@ -50,9 +50,14 @@ pipeline {
         }
 
         stage('Push Docker Image') {
+            environment {
+                DOCKER_USERNAME = credentials('dockerhub-username')  // [Ensure this exists in Jenkins]
+                DOCKER_PASSWORD = credentials('dockerhub-password')  // [Use Docker Hub Access Token]
+            }
             steps {
-                withDockerRegistry([credentialsId: 'dockerhub-credentials', url: '']) { // [CHANGE] DockerHub credentials in Jenkins
+                script {
                     sh '''
+                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
                     docker push $DOCKER_IMAGE
                     '''
                 }
