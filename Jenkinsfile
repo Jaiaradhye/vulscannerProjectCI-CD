@@ -23,8 +23,8 @@ pipeline {
                     $SCANNER_HOME/bin/sonar-scanner \
                         -Dsonar.projectKey=NessusScanner \  # [CHANGE] Unique project key in SonarQube
                         -Dsonar.sources=. \ # [DO NOT CHANGE] Scan all source files
-                        -Dsonar.host.url=$SONARQUBE_URL \ # [CHANGE] SonarQube server URL
-                        -Dsonar.login=$SONARQUBE_TOKEN # [CHANGE] SonarQube authentication token
+                        -Dsonar.host.url=$http://3.108.81.135:9000/ \ # [CHANGE] SonarQube server URL
+                        -Dsonar.login=$squ_b8df9e36659dc7f2dc634000b4f7d7464bd9d534 # [CHANGE] SonarQube authentication token
                     '''
                 }
             }
