@@ -1,22 +1,12 @@
 
 ### **Phase 1: Initial Setup and Deployment**
 
-**Step 1: Launch EC2 (Ubuntu 22.04):**
+**Step 1: Launch EC2 (debian =):**
 
-- Provision an EC2 instance on AWS with Ubuntu 22.04.
-- Connect to the instance using SSH.
+- Provision an EC2 instance on AWS with debian.
+- Connect to the instance using putty ppk .
 
-**Step 2: Clone the Code:**
-
-- Update all the packages and then clone the code.
-- Clone your application's code repository onto the EC2 instance:
-    
-    ```bash
-    git clone https://github.com/N4si/DevSecOps-Project.git
-    ```
-    
-
-**Step 3: Install Docker and Run the App Using a Container:**
+**Step 2: Install Docker and Run the App Using a Container:**
 
 - Set up Docker on the EC2 instance:
     
@@ -24,7 +14,7 @@
     
     sudo apt-get update
     sudo apt-get install docker.io -y
-    sudo usermod -aG docker $USER  # Replace with your system's username, e.g., 'ubuntu'
+    sudo usermod -aG docker $USER  # Replace with your system's username, e.g., 'admin'
     newgrp docker
     sudo chmod 777 /var/run/docker.sock
     ```
@@ -32,30 +22,13 @@
 - Build and run your application using Docker containers:
     
     ```bash
-    docker build -t netflix .
-    docker run -d --name netflix -p 8081:80 netflix:latest
+    docker build -t nessus .
+    docker run -d --name nessus-p 8081:80 nessus:latest
     
     #to delete
     docker stop <containerid>
-    docker rmi -f netflix
+    docker rmi -f nessus
     ```
-
-It will show an error cause you need API key
-
-**Step 4: Get the API Key:**
-
-- Open a web browser and navigate to TMDB (The Movie Database) website.
-- Click on "Login" and create an account.
-- Once logged in, go to your profile and select "Settings."
-- Click on "API" from the left-side panel.
-- Create a new API key by clicking "Create" and accepting the terms and conditions.
-- Provide the required basic details and click "Submit."
-- You will receive your TMDB API key.
-
-Now recreate the Docker image with your api key:
-```
-docker build --build-arg TMDB_V3_API_KEY=<your-api-key> -t netflix .
-```
 
 **Phase 2: Security**
 
@@ -179,14 +152,14 @@ pipeline {
         }
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/N4si/DevSecOps-Project.git'
+                git branch: 'main', url: '
             }
         }
         stage("Sonarqube Analysis") {
             steps {
                 withSonarQubeEnv('sonar-server') {
-                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Netflix \
-                    -Dsonar.projectKey=Netflix'''
+                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Net \
+                    -Dsonar.projectKey=Net'''
                 }
             }
         }
@@ -197,33 +170,10 @@ pipeline {
                 }
             }
         }
-        stage('Install Dependencies') {
-            steps {
-                sh "npm install"
-            }
-        }
-    }
-}
-```
-
+      
 Certainly, here are the instructions without step numbers:
 
-**Install Dependency-Check and Docker Tools in Jenkins**
 
-**Install Dependency-Check Plugin:**
-
-- Go to "Dashboard" in your Jenkins web interface.
-- Navigate to "Manage Jenkins" → "Manage Plugins."
-- Click on the "Available" tab and search for "OWASP Dependency-Check."
-- Check the checkbox for "OWASP Dependency-Check" and click on the "Install without restart" button.
-
-**Configure Dependency-Check Tool:**
-
-- After installing the Dependency-Check plugin, you need to configure the tool.
-- Go to "Dashboard" → "Manage Jenkins" → "Global Tool Configuration."
-- Find the section for "OWASP Dependency-Check."
-- Add the tool's name, e.g., "DP-Check."
-- Save your settings.
 
 **Install Docker Tools and Docker Plugins:**
 
@@ -252,84 +202,107 @@ Now, you have installed the Dependency-Check plugin, configured the tool, and ad
 
 ```groovy
 
-pipeline{
+pipeline {
     agent any
-    tools{
-        jdk 'jdk17'
-        nodejs 'node16'
-    }
+
     environment {
-        SCANNER_HOME=tool 'sonar-scanner'
+        SCANNER_HOME = tool 'sonar-scanner' // [CHANGE] SonarQube Scanner tool name in Jenkins
+        DOCKER_IMAGE = "jaiaradhye/vulscanner:latest" // [CHANGE] DockerHub image name
+        SONARQUBE_URL = "http://3.108.81.135:9000" // [CHANGE] SonarQube server URL
+        SONARQUBE_TOKEN = "squ_b8df9e36659dc7f2dc634000b4f7d7464bd9d534" // [CHANGE] SonarQube authentication token
+        KUBE_CONFIG = "~/.kube/config" // [CHANGE] Path to Kubernetes config file
     }
+
     stages {
-        stage('clean workspace'){
-            steps{
-                cleanWs()
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Jaiaradhye/vulscannerProjectCI-CD.git' // [CHANGE] Your GitHub repo URL
             }
         }
-        stage('Checkout from Git'){
-            steps{
-                git branch: 'main', url: 'https://github.com/N4si/DevSecOps-Project.git'
-            }
-        }
-        stage("Sonarqube Analysis "){
-            steps{
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Netflix \
-                    -Dsonar.projectKey=Netflix '''
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube-server') { // [CHANGE] SonarQube server name from Jenkins settings
+                    sh '''
+                    $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectKey=NessusScanner \
+                        -Dsonar.sources=. \
+                        -Dsonar.host.url=http://3.108.81.135:9000 \
+                        -Dsonar.login=squ_b8df9e36659dc7f2dc634000b4f7d7464bd9d534
+                    '''
                 }
             }
         }
-        stage("quality gate"){
-           steps {
+
+        stage('Quality Gate Check') {
+            steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
-                }
-            } 
-        }
-        stage('Install Dependencies') {
-            steps {
-                sh "npm install"
-            }
-        }
-        stage('OWASP FS SCAN') {
-            steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            }
-        }
-        stage('TRIVY FS SCAN') {
-            steps {
-                sh "trivy fs . > trivyfs.txt"
-            }
-        }
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                       sh "docker build --build-arg TMDB_V3_API_KEY=<yourapikey> -t netflix ."
-                       sh "docker tag netflix nasi101/netflix:latest "
-                       sh "docker push nasi101/netflix:latest "
+                    def qualityGate = waitForQualityGate() // [DO NOT CHANGE] Checks SonarQube quality gate status
+                    if (qualityGate.status != 'OK') {
+                        error "Pipeline aborted due to quality gate failure: ${qualityGate.status}"
                     }
                 }
             }
         }
-        stage("TRIVY"){
-            steps{
-                sh "trivy image nasi101/netflix:latest > trivyimage.txt" 
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                docker build -t $DOCKER_IMAGE .
+                '''
             }
         }
-        stage('Deploy to container'){
-            steps{
-                sh 'docker run -d --name netflix -p 8081:80 nasi101/netflix:latest'
+
+        stage('Push Docker Image') {
+            environment {
+                DOCKER_USERNAME = credentials('dockerhub-Jaiaradhye')  // [Ensure this exists in Jenkins]
+                DOCKER_PASSWORD = credentials('dockerhub-dckr_pat_oJjo9w3Z8TGbtcj7ISp0-eYWboY')  // [Use Docker Hub Access Token]
+            }
+            steps {
+                script {
+                    sh '''
+                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                    docker push $DOCKER_IMAGE
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                kubectl --kubeconfig=$KUBE_CONFIG apply -f k8s-nessus-deployment.yaml
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh '''
+                kubectl --kubeconfig=$KUBE_CONFIG get pods -l app=nessus
+                kubectl --kubeconfig=$KUBE_CONFIG get services -l app=nessus
+                '''
+            }
+        }
+
+        stage('Monitor with Prometheus') {
+            steps {
+                sh '''
+                kubectl --kubeconfig=$KUBE_CONFIG port-forward svc/prometheus 9090:9090 &
+                '''
             }
         }
     }
+
+    post {
+        success {
+            echo "Pipeline executed successfully!"
+        }
+        failure {
+            echo "Pipeline failed. Check logs for errors."
+        }
+    }
 }
-
-
-If you get docker login failed errorr
-
 sudo su
 sudo usermod -aG docker jenkins
 sudo systemctl restart jenkins
@@ -611,8 +584,6 @@ When you log in for the first time, Grafana will prompt you to change the defaul
 **Step 9: Add Prometheus Data Source:**
 
 To visualize metrics, you need to add a data source. Follow these steps:
-
-- Click on the gear icon (⚙️) in the left sidebar to open the "Configuration" menu.
 
 - Select "Data Sources."
 
