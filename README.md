@@ -1,3 +1,4 @@
+![image](https://github.com/user-attachments/assets/6fc9f552-f901-4ec0-aad1-eaf2d7178178)
 
 ### **Phase 1: Initial Setup and Deployment**
 
